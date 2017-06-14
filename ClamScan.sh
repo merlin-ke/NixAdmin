@@ -1,4 +1,5 @@
 #!/bin/bash
+#Author muchilwal@gmail.com
 timestamp=$(date "+%Y.%m.%d")
 scan=$(hostname).$timestamp.Daily.txt
 myhome=$(hostname | cut -d . -f1)
