@@ -1,0 +1,71 @@
+#Run the command as sudo
+#Install clam and mail prerequisites
+apt-get update
+apt-get install clamav-daemon sendmail mailutils sendmail-bin 
+
+# Stop some clam services then update it, otherwise you might get an error when updating.
+# If using a firewall, you might what to whitelist the clam url incase the updates fail.
+sudo service clamav-freshclam stop
+sudo  freshclam
+#Start the services once update is done
+sudo service clamav-freshclam start
+
+##Scan script Directory
+#the Script folder will hold the scripts, while the scanresult will hold the scan result
+mkdir -p /home/Scripts/scanresult/
+cd  /home/Scripts/
+#Create File for Daily Scan. You can modify this script to seach other directories and add more clam options
+vi Dailyscan.sh
+#!/bin/bash
+timestamp=$(date "+%Y.%m.%d")
+scan=$(hostname).$timestamp.Daily.txt
+myhome=$(hostname | cut -d . -f1)
+mymail=$myhome
+mysupport="123@123.com"
+status=$?
+echo "Subject:Daily Scan Report For $(hostname | cut -d . -f1) On $(date "+%Y.%m.%d")" > /home/Scripts/scanresult/$scan
+echo "MIME-Version: 1.0" >> /home/Scripts/scanresult/$scan
+echo "Content-Type: text/plain" >> /home/Scripts/scanresult/$scan
+echo "From: $myhome<$mymail>" >> /home/Scripts/scanresult/$scan
+echo "Sender:$myhome <$mymail>" >> /home/Scripts/scanresult/$scan
+echo -en '\n' >>  /home/Scripts/scanresult/$scan
+sudo clamscan -i -r  /123/123/123/ /12/lo34/ >> /home/Scripts/scanresult/$scan
+if [ "$status" = "0" ]; then
+       /usr/sbin/sendmail $mysupport < /home/Scripts/scanresult/$scan
+else
+   echo "Subject:Scan Report For $(hostname | cut -d . -f1) On $(date "+%Y.%m.%d") Failed" | sudo /usr/sbin/sendmail $mysupport
+fi
+##Save the file and give it executable permission.
+sudo chmod -R 755 /home/Scripts/
+##We will use cronjobs to make the script run daily or weekly or monthly. The job i
+sudo crontab -e
+0 16   1 * * /home/Scripts/Monthlyscan.sh >/dev/null 2>&1
+0 13   * * 7 /home/Scripts/Weeklyscan.sh >/dev/null 2>&1
+0 10    * * * /home/Scripts/Dailyscan.sh >/dev/null 2>&1
+##Configure gmail relay
+mkdir -m 700 /etc/mail/authinfo/
+cd /etc/mail/authinfo/
+vi gmail-auth
+AuthInfo: "U:root" "I:123@123.com" "P:mypassword" 
+#save the file.
+#Run the makemap commnad
+makemap hash gmail-auth < gmail-auth
+#Put bellow lines into your sendmail.mc configuration file right above first "MAILER" definition line:
+vi /etc/mail/sendmail.mc 
+define(`SMART_HOST',`[smtp.gmail.com]')dnl
+define(`RELAY_MAILER_ARGS', `TCP $h 587')dnl
+define(`ESMTP_MAILER_ARGS', `TCP $h 587')dnl
+define(`confAUTH_OPTIONS', `A p')dnl
+TRUST_AUTH_MECH(`EXTERNAL DIGEST-MD5 CRAM-MD5 LOGIN PLAIN')dnl
+define(`confAUTH_MECHANISMS', `EXTERNAL GSSAPI DIGEST-MD5 CRAM-MD5 LOGIN PLAIN')dnl
+FEATURE(`authinfo',`hash -o /etc/mail/authinfo/gmail-auth.db')dnl
+#save file
+make -C /etc/mail
+/etc/init.d/sendmail reload
+#Test if the mail work
+echo "Just testing my sendmail gmail relay" | mail -s "Sendmail gmail Relay" 123@232.com
+
+---------End---------
+if everything was setup well, clam will run and send reports to your email. You might want to run the script manualluy first to be sure it work.
+cd  /home/Scripts/
+./Dailyscan.sh
