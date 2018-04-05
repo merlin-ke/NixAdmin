@@ -1,0 +1,6 @@
+#!/bin/bash
+for i in $(getent passwd | egrep -v "false|nologin" | cut -d ":" -f1)
+do
+echo "################################## Password Aging information for $i ##############################"
+chage -l $i
+done
